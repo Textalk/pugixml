@@ -4787,6 +4787,15 @@ namespace pugi
 
 		print(writer, indent, flags, encoding, depth);
 	}
+
+	PUGI__FN QString xml_node::print_string(const char_t* indent, unsigned int flags, xml_encoding encoding, unsigned int depth) const
+	{
+		QBuffer result;
+
+		print(result, indent, flags, encoding, depth);
+
+		return QString::fromUtf8(result.data(), result.size());
+	}
 #endif
 
 	PUGI__FN ptrdiff_t xml_node::offset_debug() const
@@ -5430,6 +5439,15 @@ namespace pugi
 		xml_writer_iodevice writer(stream);
 
 		save(writer, indent, flags, encoding);
+	}
+
+	PUGI__FN QString xml_document::save_string(const char_t* indent, unsigned int flags, xml_encoding encoding) const
+	{
+		QBuffer result;
+
+		save(result, indent, flags, encoding);
+
+		return QString::fromUtf8(result.data(), result.size());
 	}
 #endif
 

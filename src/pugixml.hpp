@@ -38,8 +38,10 @@
 #endif
 
 #ifndef PUGIXML_NO_QT
+# include <QBuffer>
 # include <QByteArray>
 # include <QIODevice>
+# include <QString>
 #endif
 
 // Macro for deprecated features
@@ -585,6 +587,7 @@ namespace pugi
 	#ifndef PUGIXML_NO_QT
 		// Print subtree to QIODevice
 		void print(QIODevice& stream, const char_t* indent = PUGIXML_TEXT("\t"), unsigned int flags = format_default, xml_encoding encoding = encoding_auto, unsigned int depth = 0) const;
+		QString print_string(const char_t* indent = PUGIXML_TEXT("\t"), unsigned int flags = format_default, xml_encoding encoding = encoding_auto, unsigned int depth = 0) const;
 	#endif
 
 		// Child nodes iterators
@@ -955,6 +958,7 @@ namespace pugi
 	#ifndef PUGIXML_NO_QT
 		// Save XML document to QIODevice (semantics is slightly different from xml_node::print, see documentation for details).
 		void save(QIODevice& stream, const char_t* indent = PUGIXML_TEXT("\t"), unsigned int flags = format_default, xml_encoding encoding = encoding_auto) const;
+		QString save_string(const char_t* indent = PUGIXML_TEXT("\t"), unsigned int flags = format_default, xml_encoding encoding = encoding_auto) const;
 	#endif
 
 		// Save XML to file
