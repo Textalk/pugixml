@@ -15,7 +15,7 @@ TEST_XML(dom_attr_assign, "<node/>")
 
 	node.append_attribute(STR("attr4")) = 4294967295u;
 	node.append_attribute(STR("attr5")) = 4294967294u;
-	xml_attribute() = 2147483647;
+	xml_attribute() = 4294967295u;
 
 	node.append_attribute(STR("attr6")) = 0.5;
 	xml_attribute() = 0.5;
@@ -49,6 +49,38 @@ TEST_XML(dom_attr_set_value, "<node/>")
 
 	CHECK_NODE(node, STR("<node attr1=\"v1\" attr2=\"-2147483647\" attr3=\"-2147483648\" attr4=\"4294967295\" attr5=\"4294967294\" attr6=\"0.5\" attr7=\"true\" />"));
 }
+
+#ifdef PUGIXML_HAS_LONG_LONG
+TEST_XML(dom_attr_assign_llong, "<node/>")
+{
+	xml_node node = doc.child(STR("node"));
+	
+	node.append_attribute(STR("attr1")) = -9223372036854775807ll;
+	node.append_attribute(STR("attr2")) = -9223372036854775807ll - 1;
+	xml_attribute() = -9223372036854775807ll - 1;
+
+	node.append_attribute(STR("attr3")) = 18446744073709551615ull;
+	node.append_attribute(STR("attr4")) = 18446744073709551614ull;
+	xml_attribute() = 18446744073709551615ull;
+
+	CHECK_NODE(node, STR("<node attr1=\"-9223372036854775807\" attr2=\"-9223372036854775808\" attr3=\"18446744073709551615\" attr4=\"18446744073709551614\" />"));
+}
+
+TEST_XML(dom_attr_set_value_llong, "<node/>")
+{
+	xml_node node = doc.child(STR("node"));
+	
+	CHECK(node.append_attribute(STR("attr1")).set_value(-9223372036854775807ll));
+	CHECK(node.append_attribute(STR("attr2")).set_value(-9223372036854775807ll - 1));
+	CHECK(!xml_attribute().set_value(-9223372036854775807ll - 1));
+
+	CHECK(node.append_attribute(STR("attr3")).set_value(18446744073709551615ull));
+	CHECK(node.append_attribute(STR("attr4")).set_value(18446744073709551614ull));
+	CHECK(!xml_attribute().set_value(18446744073709551615ull));
+
+	CHECK_NODE(node, STR("<node attr1=\"-9223372036854775807\" attr2=\"-9223372036854775808\" attr3=\"18446744073709551615\" attr4=\"18446744073709551614\" />"));
+}
+#endif
 
 TEST_XML(dom_node_set_name, "<node>text</node>")
 {
@@ -1024,4 +1056,21 @@ TEST(dom_node_append_buffer_out_of_memory_buffer)
 	xml_document doc;
 	CHECK(doc.append_buffer(data, sizeof(data)).status == status_out_of_memory);
 	CHECK(!doc.first_child());
+}
+
+TEST_XML(dom_node_append_buffer_fragment, "<node />")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(node.append_buffer("1", 1).status == status_no_document_element);
+	CHECK_NODE(doc, STR("<node>1</node>"));
+
+	CHECK(node.append_buffer("2", 1, parse_fragment));
+	CHECK_NODE(doc, STR("<node>12</node>"));
+
+	CHECK(node.append_buffer("3", 1).status == status_no_document_element);
+	CHECK_NODE(doc, STR("<node>123</node>"));
+
+	CHECK(node.append_buffer("4", 1, parse_fragment));
+	CHECK_NODE(doc, STR("<node>1234</node>"));
 }

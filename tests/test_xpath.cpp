@@ -328,7 +328,7 @@ TEST(xpath_large_node_set)
 
 TEST(xpath_out_of_memory_evaluate_concat)
 {
-	test_runner::_memory_fail_threshold = 4096 * 2 * sizeof(char_t) + 4096 * 2;
+	test_runner::_memory_fail_threshold = 4196 * sizeof(char_t) + 4096 * 2;
 
 	std::basic_string<char_t> query = STR("concat(\"a\", \"");
 
@@ -354,7 +354,7 @@ TEST(xpath_out_of_memory_evaluate_concat)
 
 TEST(xpath_out_of_memory_evaluate_substring)
 {
-	test_runner::_memory_fail_threshold = 4096 * 2 * sizeof(char_t) + 4096 * 2;
+	test_runner::_memory_fail_threshold = 4196 * sizeof(char_t) + 4096 * 2;
 
 	std::basic_string<char_t> query = STR("substring(\"");
 
@@ -418,6 +418,20 @@ TEST_XML(xpath_out_of_memory_evaluate_predicate, "<node><a/><a/><a/><a/><a/><a/>
 	{
 	}
 #endif
+}
+
+TEST(xpath_memory_concat_massive)
+{
+	pugi::xml_document doc;
+	pugi::xml_node node = doc.append_child(STR("node"));
+
+	for (int i = 0; i < 5000; ++i)
+		node.append_child(STR("c")).text().set(i % 10);
+
+	pugi::xpath_query q(STR("/"));
+	size_t size = q.evaluate_string(0, 0, node);
+
+	CHECK(size == 5001);
 }
 
 #endif

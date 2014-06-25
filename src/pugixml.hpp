@@ -1,7 +1,7 @@
 /**
- * pugixml parser - version 1.2
+ * pugixml parser - version 1.4
  * --------------------------------------------------------
- * Copyright (C) 2006-2012, by Arseny Kapoulkine (arseny.kapoulkine@gmail.com)
+ * Copyright (C) 2006-2014, by Arseny Kapoulkine (arseny.kapoulkine@gmail.com)
  * Report bugs and download new versions at http://pugixml.org/
  *
  * This library is distributed under the MIT License. See notice at the end
@@ -13,7 +13,7 @@
 
 #ifndef PUGIXML_VERSION
 // Define version macro; evaluates to major * 100 + minor so that it's safe to use in less-than comparisons
-#	define PUGIXML_VERSION 120
+#	define PUGIXML_VERSION 140
 #endif
 
 // Include user configuration file (this can define various configuration macros)
@@ -68,6 +68,15 @@
 // If no API for functions is defined, assume default
 #ifndef PUGIXML_FUNCTION
 #	define PUGIXML_FUNCTION PUGIXML_API
+#endif
+
+// If the platform is known to have long long support, enable long long functions
+#ifndef PUGIXML_HAS_LONG_LONG
+#	if defined(__cplusplus) && __cplusplus >= 201103
+#		define PUGIXML_HAS_LONG_LONG
+#	elif defined(_MSC_VER) && _MSC_VER >= 1400
+#		define PUGIXML_HAS_LONG_LONG
+#	endif
 #endif
 
 // Character interface macros
@@ -148,6 +157,13 @@ namespace pugi
 	// of whitespace is added to the DOM tree.
 	// This flag is off by default; turning it on may result in slower parsing and more memory consumption.
 	const unsigned int parse_ws_pcdata_single = 0x0400;
+
+	// This flag determines if leading and trailing whitespace is to be removed from plain character data. This flag is off by default.
+	const unsigned int parse_trim_pcdata = 0x0800;
+
+	// This flag determines if plain character data that does not have a parent node is added to the DOM tree, and if an empty document
+	// is a valid document. This flag is off by default.
+	const unsigned int parse_fragment = 0x1000;
 
 	// The default parsing mode.
 	// Elements, PCDATA and CDATA sections are added to the DOM tree, character/reference entities are expanded,
@@ -342,6 +358,11 @@ namespace pugi
 		double as_double(double def = 0) const;
 		float as_float(float def = 0) const;
 
+	#ifdef PUGIXML_HAS_LONG_LONG
+		long long as_llong(long long def = 0) const;
+		unsigned long long as_ullong(unsigned long long def = 0) const;
+	#endif
+
 		// Get attribute value as bool (returns true if first character is in '1tTyY' set), or the default value if attribute is empty
 		bool as_bool(bool def = false) const;
 
@@ -355,12 +376,22 @@ namespace pugi
 		bool set_value(double rhs);
 		bool set_value(bool rhs);
 
+	#ifdef PUGIXML_HAS_LONG_LONG
+		bool set_value(long long rhs);
+		bool set_value(unsigned long long rhs);
+	#endif
+
 		// Set attribute value (equivalent to set_value without error checking)
 		xml_attribute& operator=(const char_t* rhs);
 		xml_attribute& operator=(int rhs);
 		xml_attribute& operator=(unsigned int rhs);
 		xml_attribute& operator=(double rhs);
 		xml_attribute& operator=(bool rhs);
+
+	#ifdef PUGIXML_HAS_LONG_LONG
+		xml_attribute& operator=(long long rhs);
+		xml_attribute& operator=(unsigned long long rhs);
+	#endif
 
 		// Get next/previous attribute in the attribute list of the parent node
 		xml_attribute next_attribute() const;
@@ -418,8 +449,11 @@ namespace pugi
 		// Get node type
 		xml_node_type type() const;
 
-		// Get node name/value, or "" if node is empty or it has no name/value
+		// Get node name, or "" if node is empty or it has no name
 		const char_t* name() const;
+
+		// Get node value, or "" if node is empty or it has no value
+        // Note: For <node>text</node> node.value() does not return "text"! Use child_value() or text() methods to access text inside nodes.
 		const char_t* value() const;
 
 		// Get attribute list
@@ -662,6 +696,11 @@ namespace pugi
 		double as_double(double def = 0) const;
 		float as_float(float def = 0) const;
 
+	#ifdef PUGIXML_HAS_LONG_LONG
+		long long as_llong(long long def = 0) const;
+		unsigned long long as_ullong(unsigned long long def = 0) const;
+	#endif
+
 		// Get text as bool (returns true if first character is in '1tTyY' set), or the default value if object is empty
 		bool as_bool(bool def = false) const;
 
@@ -674,12 +713,22 @@ namespace pugi
 		bool set(double rhs);
 		bool set(bool rhs);
 
+	#ifdef PUGIXML_HAS_LONG_LONG
+		bool set(long long rhs);
+		bool set(unsigned long long rhs);
+	#endif
+
 		// Set text (equivalent to set without error checking)
 		xml_text& operator=(const char_t* rhs);
 		xml_text& operator=(int rhs);
 		xml_text& operator=(unsigned int rhs);
 		xml_text& operator=(double rhs);
 		xml_text& operator=(bool rhs);
+
+	#ifdef PUGIXML_HAS_LONG_LONG
+		xml_text& operator=(long long rhs);
+		xml_text& operator=(unsigned long long rhs);
+	#endif
 
 		// Get the data node (node_pcdata or node_cdata) for this object
 		xml_node data() const;
@@ -778,6 +827,8 @@ namespace pugi
 	// Named node range helper
 	class PUGIXML_CLASS xml_named_node_iterator
 	{
+		friend class xml_node;
+
 	public:
 		// Iterator traits
 		typedef ptrdiff_t difference_type;
@@ -786,7 +837,7 @@ namespace pugi
 		typedef xml_node& reference;
 
 	#ifndef PUGIXML_NO_STL
-		typedef std::forward_iterator_tag iterator_category;
+		typedef std::bidirectional_iterator_tag iterator_category;
 	#endif
 
 		// Default constructor
@@ -805,9 +856,15 @@ namespace pugi
 		const xml_named_node_iterator& operator++();
 		xml_named_node_iterator operator++(int);
 
+		const xml_named_node_iterator& operator--();
+		xml_named_node_iterator operator--(int);
+
 	private:
-		mutable xml_node _node;
+		mutable xml_node _wrap;
+		xml_node _parent;
 		const char_t* _name;
+
+		xml_named_node_iterator(xml_node_struct* ref, xml_node_struct* parent, const char_t* name);
 	};
 
 	// Abstract tree walker class (see xml_node::traverse)
@@ -858,7 +915,9 @@ namespace pugi
 		status_bad_end_element,		// Parsing error occurred while parsing end element tag
 		status_end_element_mismatch,// There was a mismatch of start-end tags (closing tag had incorrect name, some tag was not closed or there was an excessive closing tag)
 
-		status_append_invalid_root	// Unable to append nodes since root type is not node_element or node_document (exclusive to xml_node::append_buffer)
+		status_append_invalid_root,	// Unable to append nodes since root type is not node_element or node_document (exclusive to xml_node::append_buffer)
+
+		status_no_document_element	// Parsing resulted in a document without element nodes
 	};
 
 	// Parsing result
@@ -1199,6 +1258,9 @@ namespace pugi
 		// Constant iterator type
 		typedef const xpath_node* const_iterator;
 
+		// We define non-constant iterator to be the same as constant iterator so that various generic algorithms (i.e. boost foreach) work
+		typedef const xpath_node* iterator;
+
 		// Default constructor. Constructs empty set.
 		xpath_node_set();
 
@@ -1276,7 +1338,7 @@ namespace std
 	// Workarounds for (non-standard) iterator category detection for older versions (MSVC7/IC8 and earlier)
 	std::bidirectional_iterator_tag PUGIXML_FUNCTION _Iter_cat(const pugi::xml_node_iterator&);
 	std::bidirectional_iterator_tag PUGIXML_FUNCTION _Iter_cat(const pugi::xml_attribute_iterator&);
-	std::forward_iterator_tag PUGIXML_FUNCTION _Iter_cat(const pugi::xml_named_node_iterator&);
+	std::bidirectional_iterator_tag PUGIXML_FUNCTION _Iter_cat(const pugi::xml_named_node_iterator&);
 }
 #endif
 
@@ -1286,14 +1348,14 @@ namespace std
 	// Workarounds for (non-standard) iterator category detection
 	std::bidirectional_iterator_tag PUGIXML_FUNCTION __iterator_category(const pugi::xml_node_iterator&);
 	std::bidirectional_iterator_tag PUGIXML_FUNCTION __iterator_category(const pugi::xml_attribute_iterator&);
-	std::forward_iterator_tag PUGIXML_FUNCTION __iterator_category(const pugi::xml_named_node_iterator&);
+	std::bidirectional_iterator_tag PUGIXML_FUNCTION __iterator_category(const pugi::xml_named_node_iterator&);
 }
 #endif
 
 #endif
 
 /**
- * Copyright (c) 2006-2012 Arseny Kapoulkine
+ * Copyright (c) 2006-2014 Arseny Kapoulkine
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
